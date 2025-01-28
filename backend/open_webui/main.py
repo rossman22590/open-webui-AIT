@@ -31,9 +31,7 @@ from fastapi import (
     applications,
     BackgroundTasks,
 )
-
 from fastapi.openapi.docs import get_swagger_ui_html
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -48,6 +46,7 @@ from open_webui.socket.main import (
     app as socket_app,
     periodic_usage_pool_cleanup,
 )
+
 # Routers
 from open_webui.routers import (
     audio,
@@ -284,7 +283,7 @@ from open_webui.env import (
     OFFLINE_MODE,
 )
 
-# get_all_models, check_model_access, etc. from utils
+# We still import get_all_models from your utils:
 from open_webui.utils.models import (
     get_all_models,
     get_all_base_models,
@@ -305,11 +304,16 @@ from open_webui.utils.security_headers import SecurityHeadersMiddleware
 # Task functions
 from open_webui.tasks import stop_task, list_tasks
 
+
 #################################################################
-# ADD: Our caching wrapper around get_all_models
+# 1) Caching wrapper around get_all_models()
 #################################################################
-@cached(ttl=300)  # Cache results for 5 minutes
+@cached(ttl=300)  # 5-minute TTL
 async def get_all_models_cached(request: Request):
+    """
+    Caches the result of get_all_models() for 5 minutes,
+    so we don't keep calling it on every request.
+    """
     return await get_all_models(request)
 #################################################################
 
@@ -330,6 +334,7 @@ class SPAStaticFiles(StaticFiles):
                 return await super().get_response("index.html", scope)
             else:
                 raise ex
+
 
 print(
     rf"""
@@ -362,6 +367,7 @@ app = FastAPI(
 
 app.state.config = AppConfig()
 
+
 ########################################
 # OLLAMA
 ########################################
@@ -385,6 +391,7 @@ app.state.OPENAI_MODELS = {}
 app.state.config.WEBUI_URL = WEBUI_URL
 app.state.config.ENABLE_SIGNUP = ENABLE_SIGNUP
 app.state.config.ENABLE_LOGIN_FORM = ENABLE_LOGIN_FORM
+
 app.state.config.ENABLE_API_KEY = ENABLE_API_KEY
 app.state.config.ENABLE_API_KEY_ENDPOINT_RESTRICTIONS = ENABLE_API_KEY_ENDPOINT_RESTRICTIONS
 app.state.config.API_KEY_ALLOWED_ENDPOINTS = API_KEY_ALLOWED_ENDPOINTS
@@ -603,7 +610,7 @@ async def commit_session_after_request(request: Request, call_next):
 @app.middleware("http")
 async def check_url(request: Request, call_next):
     start_time = int(time.time())
-    # Using the config's value for ENABLE_API_KEY safely
+    # Using the config's value for ENABLE_API_KEY
     request.state.enable_api_key = app.state.config.ENABLE_API_KEY
     response = await call_next(request)
     process_time = int(time.time()) - start_time
@@ -635,6 +642,8 @@ app.add_middleware(
 
 app.mount("/ws", socket_app)
 
+
+# Routers
 app.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
 app.include_router(openai.router, prefix="/openai", tags=["openai"])
 app.include_router(pipelines.router, prefix="/api/v1/pipelines", tags=["pipelines"])
@@ -659,75 +668,73 @@ app.include_router(functions.router, prefix="/api/v1/functions", tags=["function
 app.include_router(evaluations.router, prefix="/api/v1/evaluations", tags=["evaluations"])
 app.include_router(utils.router, prefix="/api/v1/utils", tags=["utils"])
 
+
 ##################################
 # Chat Endpoints
 ##################################
 
 @app.get("/api/models")
 async def get_models(request: Request, user=Depends(get_verified_user)):
+    """
+    Returns the list of models, caching them if needed to avoid repeated re-fetches.
+    """
     def get_filtered_models(models_list, current_user):
-        filtered_models = []
-        for model in models_list:
-            if model.get("arena"):
-                # Access check for "arena" models
+        filtered = []
+        for m in models_list:
+            if m.get("arena"):
+                # Check arena model access
                 if has_access(
                     current_user.id,
                     type="read",
-                    access_control=model.get("info", {}).get("meta", {}).get("access_control", {}),
+                    access_control=m.get("info", {}).get("meta", {}).get("access_control", {}),
                 ):
-                    filtered_models.append(model)
+                    filtered.append(m)
                 continue
 
-            # Normal model
-            model_info = Models.get_model_by_id(model["id"])
+            model_info = Models.get_model_by_id(m["id"])
             if model_info:
                 if (
                     current_user.id == model_info.user_id
                     or has_access(current_user.id, type="read", access_control=model_info.access_control)
                 ):
-                    filtered_models.append(model)
-        return filtered_models
+                    filtered.append(m)
+        return filtered
 
-    #################################################################
-    # Use the cached version to load all models only once
-    #################################################################
+    # Only load from DB if we haven't already stored them
     if not app.state.MODELS:
-        # If app.state.MODELS is empty, we fetch from our cached function
-        all_models = await get_all_models_cached(request)
-        # Store them in memory so subsequent calls skip
-        app.state.MODELS = {m["id"]: m for m in all_models}
-    # Convert back to a list
-    models_list = list(app.state.MODELS.values())
-    #################################################################
+        all_models = await get_all_models_cached(request)  # Calls the caching wrapper
+        app.state.MODELS = {model["id"]: model for model in all_models}
 
-    # Filter out pipelines with type=filter
+    models_list = list(app.state.MODELS.values())
+
+    # Filter out pipeline type="filter"
     models_list = [
         m for m in models_list
         if "pipeline" not in m or m["pipeline"].get("type") != "filter"
     ]
 
-    # Sort if there's a MODEL_ORDER_LIST
-    model_order_list = request.app.state.config.MODEL_ORDER_LIST
+    # Sort if there's a model_order_list
+    model_order_list = app.state.config.MODEL_ORDER_LIST
     if model_order_list:
         order_dict = {mid: i for i, mid in enumerate(model_order_list)}
-        models_list.sort(
-            key=lambda x: (order_dict.get(x["id"], float("inf")), x["name"])
-        )
+        models_list.sort(key=lambda x: (order_dict.get(x["id"], float("inf")), x["name"]))
 
-    # Filter for normal user
+    # If user is normal, filter out restricted models
     if user.role == "user" and not BYPASS_MODEL_ACCESS_CONTROL:
         models_list = get_filtered_models(models_list, user)
 
     log.debug(
-        f"/api/models returned filtered models accessible to the user: "
-        + json.dumps([m['id'] for m in models_list])
+        f"/api/models returned filtered models: "
+        + json.dumps([m["id"] for m in models_list])
     )
     return {"data": models_list}
 
+
 @app.get("/api/models/base")
-async def get_base_models(request: Request, user=Depends(get_admin_user)):
+async def get_base_models_endpoint(request: Request, user=Depends(get_admin_user)):
     models_list = await get_all_base_models(request)
     return {"data": models_list}
+
 
 @app.post("/api/chat/completions")
 async def chat_completion(
@@ -735,13 +742,13 @@ async def chat_completion(
     form_data: dict,
     user=Depends(get_verified_user),
 ):
-    #################################################################
-    # Similarly, ensure app.state.MODELS is loaded
-    #################################################################
+    """
+    Chat completion endpoint. Checks if app.state.MODELS is empty,
+    then calls the caching function get_all_models_cached() once.
+    """
     if not app.state.MODELS:
         all_models = await get_all_models_cached(request)
         app.state.MODELS = {m["id"]: m for m in all_models}
-    #################################################################
 
     tasks = form_data.pop("background_tasks", None)
     try:
@@ -788,6 +795,7 @@ async def chat_completion(
 generate_chat_completions = chat_completion
 generate_chat_completion = chat_completion
 
+
 @app.post("/api/chat/completed")
 async def chat_completed(
     request: Request, form_data: dict, user=Depends(get_verified_user)
@@ -799,6 +807,7 @@ async def chat_completed(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
 
 @app.post("/api/chat/actions/{action_id}")
 async def chat_action(
@@ -812,6 +821,7 @@ async def chat_action(
             detail=str(e),
         )
 
+
 @app.post("/api/tasks/stop/{task_id}")
 async def stop_task_endpoint(task_id: str, user=Depends(get_verified_user)):
     try:
@@ -819,6 +829,7 @@ async def stop_task_endpoint(task_id: str, user=Depends(get_verified_user)):
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
 
 @app.get("/api/tasks")
 async def list_tasks_endpoint(user=Depends(get_verified_user)):
@@ -913,6 +924,7 @@ async def get_app_config(request: Request):
         ),
     }
 
+
 class UrlForm(BaseModel):
     url: str
 
@@ -930,9 +942,7 @@ async def update_webhook_url(form_data: UrlForm, user=Depends(get_admin_user)):
 
 @app.get("/api/version")
 async def get_app_version():
-    return {
-        "version": VERSION,
-    }
+    return {"version": VERSION}
 
 @app.get("/api/version/updates")
 async def get_app_latest_release_version():
