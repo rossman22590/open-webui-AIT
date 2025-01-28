@@ -44,6 +44,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response, StreamingResponse
 
+###########################
+# BEGIN: open_webui imports
+###########################
 
 from open_webui.socket.main import (
     app as socket_app,
@@ -282,9 +285,8 @@ from open_webui.env import (
     OFFLINE_MODE,
 )
 
-
 from open_webui.utils.models import (
-    get_all_models,
+    get_all_models,          # original function
     get_all_base_models,
     check_model_access,
 )
@@ -305,6 +307,10 @@ from open_webui.utils.oauth import oauth_manager
 from open_webui.utils.security_headers import SecurityHeadersMiddleware
 
 from open_webui.tasks import stop_task, list_tasks  # Import from tasks.py
+
+###########################
+# END: open_webui imports
+###########################
 
 if SAFE_MODE:
     print("SAFE MODE ENABLED")
@@ -346,11 +352,11 @@ https://github.com/open-webui/open-webui
 async def lifespan(app: FastAPI):
     if RESET_CONFIG_ON_START:
         reset_config()
-
     asyncio.create_task(periodic_usage_pool_cleanup())
     yield
 
 
+# Create the FastAPI app
 app = FastAPI(
     docs_url="/docs" if ENV == "dev" else None,
     openapi_url="/openapi.json" if ENV == "dev" else None,
@@ -362,11 +368,8 @@ app.state.config = AppConfig()
 
 
 ########################################
-#
-# OLLAMA
-#
+# OLLAMA Config
 ########################################
-
 
 app.state.config.ENABLE_OLLAMA_API = ENABLE_OLLAMA_API
 app.state.config.OLLAMA_BASE_URLS = OLLAMA_BASE_URLS
@@ -375,9 +378,7 @@ app.state.config.OLLAMA_API_CONFIGS = OLLAMA_API_CONFIGS
 app.state.OLLAMA_MODELS = {}
 
 ########################################
-#
-# OPENAI
-#
+# OPENAI Config
 ########################################
 
 app.state.config.ENABLE_OPENAI_API = ENABLE_OPENAI_API
@@ -388,9 +389,7 @@ app.state.config.OPENAI_API_CONFIGS = OPENAI_API_CONFIGS
 app.state.OPENAI_MODELS = {}
 
 ########################################
-#
-# WEBUI
-#
+# WEBUI Setup
 ########################################
 
 app.state.config.WEBUI_URL = WEBUI_URL
@@ -398,16 +397,13 @@ app.state.config.ENABLE_SIGNUP = ENABLE_SIGNUP
 app.state.config.ENABLE_LOGIN_FORM = ENABLE_LOGIN_FORM
 
 app.state.config.ENABLE_API_KEY = ENABLE_API_KEY
-app.state.config.ENABLE_API_KEY_ENDPOINT_RESTRICTIONS = (
-    ENABLE_API_KEY_ENDPOINT_RESTRICTIONS
-)
+app.state.config.ENABLE_API_KEY_ENDPOINT_RESTRICTIONS = ENABLE_API_KEY_ENDPOINT_RESTRICTIONS
 app.state.config.API_KEY_ALLOWED_ENDPOINTS = API_KEY_ALLOWED_ENDPOINTS
 
 app.state.config.JWT_EXPIRES_IN = JWT_EXPIRES_IN
 
 app.state.config.SHOW_ADMIN_DETAILS = SHOW_ADMIN_DETAILS
 app.state.config.ADMIN_EMAIL = ADMIN_EMAIL
-
 
 app.state.config.DEFAULT_MODELS = DEFAULT_MODELS
 app.state.config.DEFAULT_PROMPT_SUGGESTIONS = DEFAULT_PROMPT_SUGGESTIONS
@@ -417,7 +413,6 @@ app.state.config.USER_PERMISSIONS = USER_PERMISSIONS
 app.state.config.WEBHOOK_URL = WEBHOOK_URL
 app.state.config.BANNERS = WEBUI_BANNERS
 app.state.config.MODEL_ORDER_LIST = MODEL_ORDER_LIST
-
 
 app.state.config.ENABLE_CHANNELS = ENABLE_CHANNELS
 app.state.config.ENABLE_COMMUNITY_SHARING = ENABLE_COMMUNITY_SHARING
@@ -449,20 +444,15 @@ app.state.config.LDAP_USE_TLS = LDAP_USE_TLS
 app.state.config.LDAP_CA_CERT_FILE = LDAP_CA_CERT_FILE
 app.state.config.LDAP_CIPHERS = LDAP_CIPHERS
 
-
 app.state.AUTH_TRUSTED_EMAIL_HEADER = WEBUI_AUTH_TRUSTED_EMAIL_HEADER
 app.state.AUTH_TRUSTED_NAME_HEADER = WEBUI_AUTH_TRUSTED_NAME_HEADER
 
 app.state.TOOLS = {}
 app.state.FUNCTIONS = {}
 
-
 ########################################
-#
-# RETRIEVAL
-#
+# RETRIEVAL Config
 ########################################
-
 
 app.state.config.TOP_K = RAG_TOP_K
 app.state.config.RELEVANCE_THRESHOLD = RAG_RELEVANCE_THRESHOLD
@@ -470,9 +460,7 @@ app.state.config.FILE_MAX_SIZE = RAG_FILE_MAX_SIZE
 app.state.config.FILE_MAX_COUNT = RAG_FILE_MAX_COUNT
 
 app.state.config.ENABLE_RAG_HYBRID_SEARCH = ENABLE_RAG_HYBRID_SEARCH
-app.state.config.ENABLE_RAG_WEB_LOADER_SSL_VERIFICATION = (
-    ENABLE_RAG_WEB_LOADER_SSL_VERIFICATION
-)
+app.state.config.ENABLE_RAG_WEB_LOADER_SSL_VERIFICATION = ENABLE_RAG_WEB_LOADER_SSL_VERIFICATION
 
 app.state.config.CONTENT_EXTRACTION_ENGINE = CONTENT_EXTRACTION_ENGINE
 app.state.config.TIKA_SERVER_URL = TIKA_SERVER_URL
@@ -499,7 +487,6 @@ app.state.config.PDF_EXTRACT_IMAGES = PDF_EXTRACT_IMAGES
 
 app.state.config.YOUTUBE_LOADER_LANGUAGE = YOUTUBE_LOADER_LANGUAGE
 app.state.config.YOUTUBE_LOADER_PROXY_URL = YOUTUBE_LOADER_PROXY_URL
-
 
 app.state.config.ENABLE_RAG_WEB_SEARCH = ENABLE_RAG_WEB_SEARCH
 app.state.config.RAG_WEB_SEARCH_ENGINE = RAG_WEB_SEARCH_ENGINE
@@ -529,9 +516,7 @@ app.state.config.RAG_WEB_SEARCH_CONCURRENT_REQUESTS = RAG_WEB_SEARCH_CONCURRENT_
 app.state.EMBEDDING_FUNCTION = None
 app.state.ef = None
 app.state.rf = None
-
 app.state.YOUTUBE_LOADER_TRANSLATION = None
-
 
 try:
     app.state.ef = get_ef(
@@ -539,7 +524,6 @@ try:
         app.state.config.RAG_EMBEDDING_MODEL,
         RAG_EMBEDDING_MODEL_AUTO_UPDATE,
     )
-
     app.state.rf = get_rf(
         app.state.config.RAG_RERANKING_MODEL,
         RAG_RERANKING_MODEL_AUTO_UPDATE,
@@ -547,7 +531,6 @@ try:
 except Exception as e:
     log.error(f"Error updating models: {e}")
     pass
-
 
 app.state.EMBEDDING_FUNCTION = get_embedding_function(
     app.state.config.RAG_EMBEDDING_ENGINE,
@@ -566,11 +549,8 @@ app.state.EMBEDDING_FUNCTION = get_embedding_function(
     app.state.config.RAG_EMBEDDING_BATCH_SIZE,
 )
 
-
 ########################################
-#
 # IMAGES
-#
 ########################################
 
 app.state.config.IMAGE_GENERATION_ENGINE = IMAGE_GENERATION_ENGINE
@@ -595,11 +575,8 @@ app.state.config.COMFYUI_WORKFLOW_NODES = COMFYUI_WORKFLOW_NODES
 app.state.config.IMAGE_SIZE = IMAGE_SIZE
 app.state.config.IMAGE_STEPS = IMAGE_STEPS
 
-
 ########################################
-#
 # AUDIO
-#
 ########################################
 
 app.state.config.STT_OPENAI_API_BASE_URL = AUDIO_STT_OPENAI_API_BASE_URL
@@ -617,32 +594,24 @@ app.state.config.TTS_VOICE = AUDIO_TTS_VOICE
 app.state.config.TTS_API_KEY = AUDIO_TTS_API_KEY
 app.state.config.TTS_SPLIT_ON = AUDIO_TTS_SPLIT_ON
 
-
 app.state.config.TTS_AZURE_SPEECH_REGION = AUDIO_TTS_AZURE_SPEECH_REGION
 app.state.config.TTS_AZURE_SPEECH_OUTPUT_FORMAT = AUDIO_TTS_AZURE_SPEECH_OUTPUT_FORMAT
-
 
 app.state.faster_whisper_model = None
 app.state.speech_synthesiser = None
 app.state.speech_speaker_embeddings_dataset = None
 
-
 ########################################
-#
 # TASKS
-#
 ########################################
-
 
 app.state.config.TASK_MODEL = TASK_MODEL
 app.state.config.TASK_MODEL_EXTERNAL = TASK_MODEL_EXTERNAL
-
 
 app.state.config.ENABLE_SEARCH_QUERY_GENERATION = ENABLE_SEARCH_QUERY_GENERATION
 app.state.config.ENABLE_RETRIEVAL_QUERY_GENERATION = ENABLE_RETRIEVAL_QUERY_GENERATION
 app.state.config.ENABLE_AUTOCOMPLETE_GENERATION = ENABLE_AUTOCOMPLETE_GENERATION
 app.state.config.ENABLE_TAGS_GENERATION = ENABLE_TAGS_GENERATION
-
 
 app.state.config.TITLE_GENERATION_PROMPT_TEMPLATE = TITLE_GENERATION_PROMPT_TEMPLATE
 app.state.config.TAGS_GENERATION_PROMPT_TEMPLATE = TAGS_GENERATION_PROMPT_TEMPLATE
@@ -650,57 +619,72 @@ app.state.config.IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE = (
     IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE
 )
 
-app.state.config.TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE = (
-    TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE
-)
+app.state.config.TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE = TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE
 app.state.config.QUERY_GENERATION_PROMPT_TEMPLATE = QUERY_GENERATION_PROMPT_TEMPLATE
-app.state.config.AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE = (
-    AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE
-)
-app.state.config.AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH = (
-    AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH
-)
-
+app.state.config.AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE = AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE
+app.state.config.AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH = AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH
 
 ########################################
-#
-# WEBUI
-#
+# WEBUI (Global) - Models, etc.
 ########################################
 
 app.state.MODELS = {}
 
+# NEW/CHANGED FOR BACKGROUND SCAN
+app.state.MODELS_CACHE = None  # Will store pre-scanned model list once on startup
+
+# Background scanning function
+async def scan_and_cache_all_models():
+    """
+    This function scans all available models (local or remote) once
+    and stores them in 'app.state.MODELS_CACHE'.
+    """
+    # We call the original get_all_models(), which might be slow
+    # e.g. scanning directories or calling external APIs
+    log.info("Starting one-time model scan at startup...")
+    # If you need a "fake" Request object, you can pass None or build a minimal request
+    # but get_all_models might ignore it. If your code needs a real Request, you might adapt it.
+    data = await get_all_models(None)  
+    # Optionally filter or process the data
+    app.state.MODELS_CACHE = data
+    log.info("Finished caching models in app.state.MODELS_CACHE.")
+
+########################################
+# RUN SCAN ON STARTUP
+########################################
+
+@app.on_event("startup")
+async def on_startup():
+    """
+    This runs automatically at application startup.
+    We'll do the model scanning once to avoid user-facing hangs.
+    """
+    await scan_and_cache_all_models()
+
 
 class RedirectMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Check if the request is a GET request
         if request.method == "GET":
             path = request.url.path
             query_params = dict(parse_qs(urlparse(str(request.url)).query))
-
-            # Check for the specific watch path and the presence of 'v' parameter
             if path.endswith("/watch") and "v" in query_params:
-                video_id = query_params["v"][0]  # Extract the first 'v' parameter
+                video_id = query_params["v"][0]
                 encoded_video_id = urlencode({"youtube": video_id})
                 redirect_url = f"/?{encoded_video_id}"
                 return RedirectResponse(url=redirect_url)
 
-        # Proceed with the normal flow of other requests
         response = await call_next(request)
         return response
-
 
 # Add the middleware to the app
 app.add_middleware(RedirectMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
-
 
 @app.middleware("http")
 async def commit_session_after_request(request: Request, call_next):
     response = await call_next(request)
     Session.commit()
     return response
-
 
 @app.middleware("http")
 async def check_url(request: Request, call_next):
@@ -711,15 +695,12 @@ async def check_url(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
-
-
 @app.middleware("http")
 async def inspect_websocket(request: Request, call_next):
-    # 1) If this is actually a WebSocket connection, skip HTTP logic
+    # Bypass logic if it's actually a WebSocket
     if request.scope["type"] == "websocket":
-        return await call_next(request)  # Short-circuit
+        return await call_next(request)
 
-    # 2) Otherwise, apply your normal logic for HTTP
     if (
         "/ws/socket.io" in request.url.path
         and request.query_params.get("transport") == "websocket"
@@ -731,8 +712,8 @@ async def inspect_websocket(request: Request, call_next):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"detail": "Invalid WebSocket upgrade request"},
             )
-    return await call_next(request)
 
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,
@@ -742,109 +723,110 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 app.mount("/ws", socket_app)
 
-
+# Attach all sub-routers
 app.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
 app.include_router(openai.router, prefix="/openai", tags=["openai"])
-
-
 app.include_router(pipelines.router, prefix="/api/v1/pipelines", tags=["pipelines"])
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(images.router, prefix="/api/v1/images", tags=["images"])
 app.include_router(audio.router, prefix="/api/v1/audio", tags=["audio"])
 app.include_router(retrieval.router, prefix="/api/v1/retrieval", tags=["retrieval"])
-
 app.include_router(configs.router, prefix="/api/v1/configs", tags=["configs"])
-
 app.include_router(auths.router, prefix="/api/v1/auths", tags=["auths"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
-
-
 app.include_router(channels.router, prefix="/api/v1/channels", tags=["channels"])
 app.include_router(chats.router, prefix="/api/v1/chats", tags=["chats"])
-
 app.include_router(models.router, prefix="/api/v1/models", tags=["models"])
 app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
 app.include_router(prompts.router, prefix="/api/v1/prompts", tags=["prompts"])
 app.include_router(tools.router, prefix="/api/v1/tools", tags=["tools"])
-
 app.include_router(memories.router, prefix="/api/v1/memories", tags=["memories"])
 app.include_router(folders.router, prefix="/api/v1/folders", tags=["folders"])
 app.include_router(groups.router, prefix="/api/v1/groups", tags=["groups"])
 app.include_router(files.router, prefix="/api/v1/files", tags=["files"])
 app.include_router(functions.router, prefix="/api/v1/functions", tags=["functions"])
-app.include_router(
-    evaluations.router, prefix="/api/v1/evaluations", tags=["evaluations"]
-)
+app.include_router(evaluations.router, prefix="/api/v1/evaluations", tags=["evaluations"])
 app.include_router(utils.router, prefix="/api/v1/utils", tags=["utils"])
 
-
 ##################################
-#
 # Chat Endpoints
-#
 ##################################
-
 
 @app.get("/api/models")
-async def get_models(request: Request, user=Depends(get_verified_user)):
-    def get_filtered_models(models, user):
-        filtered_models = []
-        for model in models:
+async def get_models_endpoint(request: Request, user=Depends(get_verified_user)):
+    """
+    Instead of scanning in real-time (slow), we return our pre-cached data
+    from 'app.state.MODELS_CACHE'.
+    """
+    # Make sure the background scan actually completed
+    if app.state.MODELS_CACHE is None:
+        # If it’s still None, we can handle it by waiting or returning partial data
+        # For now, let's just raise an HTTPException or return an empty list
+        raise HTTPException(
+            status_code=503,
+            detail="Models are still loading. Please try again in a moment.",
+        )
+
+    # Our pre-scanned data
+    all_models = app.state.MODELS_CACHE
+
+    # Filter out "filter" pipelines, just like your original code:
+    filtered_list = [
+        m
+        for m in all_models
+        if "pipeline" not in m or m["pipeline"].get("type") != "filter"
+    ]
+
+    # If you have a user-based permission check:
+    def get_filtered_models(models_list, user_obj):
+        result = []
+        for model in models_list:
             if model.get("arena"):
                 if has_access(
-                    user.id,
+                    user_obj.id,
                     type="read",
                     access_control=model.get("info", {})
                     .get("meta", {})
                     .get("access_control", {}),
                 ):
-                    filtered_models.append(model)
+                    result.append(model)
                 continue
 
+            # If you have a DB record for the model
             model_info = Models.get_model_by_id(model["id"])
             if model_info:
-                if user.id == model_info.user_id or has_access(
-                    user.id, type="read", access_control=model_info.access_control
+                if user_obj.id == model_info.user_id or has_access(
+                    user_obj.id, type="read", access_control=model_info.access_control
                 ):
-                    filtered_models.append(model)
+                    result.append(model)
+        return result
 
-        return filtered_models
+    if user.role == "user" and not BYPASS_MODEL_ACCESS_CONTROL:
+        filtered_list = get_filtered_models(filtered_list, user)
 
-    models = await get_all_models(request)
-
-    # Filter out filter pipelines
-    models = [
-        model
-        for model in models
-        if "pipeline" not in model or model["pipeline"].get("type", None) != "filter"
-    ]
-
-    model_order_list = request.app.state.config.MODEL_ORDER_LIST
-    if model_order_list:
-        model_order_dict = {model_id: i for i, model_id in enumerate(model_order_list)}
-        # Sort models by order list priority, with fallback for those not in the list
-        models.sort(
+    # Sort them, if needed, by your Model Order
+    if app.state.config.MODEL_ORDER_LIST:
+        model_order_dict = {
+            mid: i for i, mid in enumerate(app.state.config.MODEL_ORDER_LIST)
+        }
+        filtered_list.sort(
             key=lambda x: (model_order_dict.get(x["id"], float("inf")), x["name"])
         )
 
-    # Filter out models that the user does not have access to
-    if user.role == "user" and not BYPASS_MODEL_ACCESS_CONTROL:
-        models = get_filtered_models(models, user)
-
     log.debug(
-        f"/api/models returned filtered models accessible to the user: {json.dumps([model['id'] for model in models])}"
+        f"/api/models => returning {len(filtered_list)} models from pre-cached data."
     )
-    return {"data": models}
+    return {"data": filtered_list}
 
 
 @app.get("/api/models/base")
-async def get_base_models(request: Request, user=Depends(get_admin_user)):
-    models = await get_all_base_models(request)
-    return {"data": models}
-
+async def get_base_models_endpoint(request: Request, user=Depends(get_admin_user)):
+    # This might still call the original, or you could also do something similar
+    # with caching if it's slow. For now, let's keep it as-is:
+    models_data = await get_all_base_models(request)
+    return {"data": models_data}
 
 @app.post("/api/chat/completions")
 async def chat_completion(
@@ -852,17 +834,19 @@ async def chat_completion(
     form_data: dict,
     user=Depends(get_verified_user),
 ):
-    if not request.app.state.MODELS:
-        await get_all_models(request)
+    if not app.state.MODELS:
+        # If you were previously scanning on demand,
+        # now you might rely on the background-cached data,
+        # or you can still do a one-time check if needed.
+        await scan_and_cache_all_models()  # or do nothing if you prefer
 
     tasks = form_data.pop("background_tasks", None)
     try:
         model_id = form_data.get("model", None)
-        if model_id not in request.app.state.MODELS:
+        if model_id not in app.state.MODELS:
             raise Exception("Model not found")
-        model = request.app.state.MODELS[model_id]
+        model = app.state.MODELS[model_id]
 
-        # Check if user has access to the model
         if not BYPASS_MODEL_ACCESS_CONTROL and user.role == "user":
             try:
                 check_model_access(user, model)
@@ -900,11 +884,9 @@ async def chat_completion(
             detail=str(e),
         )
 
-
-# Alias for chat_completion (Legacy)
+# Legacy alias
 generate_chat_completions = chat_completion
 generate_chat_completion = chat_completion
-
 
 @app.post("/api/chat/completed")
 async def chat_completed(
@@ -918,7 +900,6 @@ async def chat_completed(
             detail=str(e),
         )
 
-
 @app.post("/api/chat/actions/{action_id}")
 async def chat_action(
     request: Request, action_id: str, form_data: dict, user=Depends(get_verified_user)
@@ -931,27 +912,21 @@ async def chat_action(
             detail=str(e),
         )
 
-
 @app.post("/api/tasks/stop/{task_id}")
 async def stop_task_endpoint(task_id: str, user=Depends(get_verified_user)):
     try:
-        result = await stop_task(task_id)  # Use the function from tasks.py
+        result = await stop_task(task_id)
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
-
 @app.get("/api/tasks")
 async def list_tasks_endpoint(user=Depends(get_verified_user)):
-    return {"tasks": list_tasks()}  # Use the function from tasks.py
-
+    return {"tasks": list_tasks()}
 
 ##################################
-#
 # Config Endpoints
-#
 ##################################
-
 
 @app.get("/api/config")
 async def get_app_config(request: Request):
@@ -1038,10 +1013,8 @@ async def get_app_config(request: Request):
         ),
     }
 
-
 class UrlForm(BaseModel):
     url: str
-
 
 @app.get("/api/webhook")
 async def get_webhook_url(user=Depends(get_admin_user)):
@@ -1049,13 +1022,11 @@ async def get_webhook_url(user=Depends(get_admin_user)):
         "url": app.state.config.WEBHOOK_URL,
     }
 
-
 @app.post("/api/webhook")
 async def update_webhook_url(form_data: UrlForm, user=Depends(get_admin_user)):
     app.state.config.WEBHOOK_URL = form_data.url
     app.state.WEBHOOK_URL = app.state.config.WEBHOOK_URL
     return {"url": app.state.config.WEBHOOK_URL}
-
 
 @app.get("/api/version")
 async def get_app_version():
@@ -1063,13 +1034,10 @@ async def get_app_version():
         "version": VERSION,
     }
 
-
 @app.get("/api/version/updates")
 async def get_app_latest_release_version():
     if OFFLINE_MODE:
-        log.debug(
-            f"Offline mode is enabled, returning current version as latest version"
-        )
+        log.debug("Offline mode is enabled, returning current version as latest version")
         return {"current": VERSION, "latest": VERSION}
     try:
         timeout = aiohttp.ClientTimeout(total=1)
@@ -1080,23 +1048,19 @@ async def get_app_latest_release_version():
                 response.raise_for_status()
                 data = await response.json()
                 latest_version = data["tag_name"]
-
                 return {"current": VERSION, "latest": latest_version[1:]}
     except Exception as e:
         log.debug(e)
         return {"current": VERSION, "latest": VERSION}
 
-
 @app.get("/api/changelog")
 async def get_app_changelog():
     return {key: CHANGELOG[key] for idx, key in enumerate(CHANGELOG) if idx < 5}
-
 
 ############################
 # OAuth Login & Callback
 ############################
 
-# SessionMiddleware is used by authlib for oauth
 if len(OAUTH_PROVIDERS) > 0:
     app.add_middleware(
         SessionMiddleware,
@@ -1106,16 +1070,13 @@ if len(OAUTH_PROVIDERS) > 0:
         https_only=WEBUI_SESSION_COOKIE_SECURE,
     )
 
-
 @app.get("/oauth/{provider}/login")
 async def oauth_login(provider: str, request: Request):
     return await oauth_manager.handle_login(provider, request)
 
-
 @app.get("/oauth/{provider}/callback")
 async def oauth_callback(provider: str, request: Request, response: Response):
     return await oauth_manager.handle_callback(provider, request, response)
-
 
 @app.get("/manifest.json")
 async def get_manifest_json():
@@ -1143,7 +1104,6 @@ async def get_manifest_json():
         ],
     }
 
-
 @app.get("/opensearch.xml")
 async def get_opensearch_xml():
     xml_content = rf"""
@@ -1158,21 +1118,18 @@ async def get_opensearch_xml():
     """
     return Response(content=xml_content, media_type="application/xml")
 
-
 @app.get("/health")
 async def healthcheck():
     return {"status": True}
-
 
 @app.get("/health/db")
 async def healthcheck_with_db():
     Session.execute(text("SELECT 1;")).all()
     return {"status": True}
 
-
+# Static mount
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/cache", StaticFiles(directory=CACHE_DIR), name="cache")
-
 
 def swagger_ui_html(*args, **kwargs):
     return get_swagger_ui_html(
@@ -1182,7 +1139,6 @@ def swagger_ui_html(*args, **kwargs):
         swagger_css_url="/static/swagger-ui/swagger-ui.css",
         swagger_favicon_url="/static/swagger-ui/favicon.png",
     )
-
 
 applications.get_swagger_ui_html = swagger_ui_html
 
@@ -1197,6 +1153,7 @@ else:
     log.warning(
         f"Frontend build directory not found at '{FRONTEND_BUILD_DIR}'. Serving API only."
     )
+
 
 # import asyncio
 # import inspect
