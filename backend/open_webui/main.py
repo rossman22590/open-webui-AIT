@@ -712,20 +712,20 @@ async def check_url(request: Request, call_next):
     return response
 
 
+
 @app.middleware("http")
 async def inspect_websocket(request: Request, call_next):
-    # CHANGED: Skip if it's actually a WebSocket scope
-    if request.scope["type"] == "websocket":  # CHANGED
-        return await call_next(request)        # CHANGED
+    # 1) If this is actually a WebSocket connection, skip HTTP logic
+    if request.scope["type"] == "websocket":
+        return await call_next(request)  # Short-circuit
 
+    # 2) Otherwise, apply your normal logic for HTTP
     if (
         "/ws/socket.io" in request.url.path
         and request.query_params.get("transport") == "websocket"
     ):
         upgrade = (request.headers.get("Upgrade") or "").lower()
         connection = (request.headers.get("Connection") or "").lower().split(",")
-
-        # Check that there's the correct headers for an upgrade, else reject the connection
         if upgrade != "websocket" or "upgrade" not in connection:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
